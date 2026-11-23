@@ -23,8 +23,16 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Подготовить Android SDK
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "Using Android SDK at: $SDK"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          SDKMAN=$(find "$SDK/cmdline-tools" -name sdkmanager 2>/dev/null | head -n 1)
+          if [ -n "$SDKMAN" ]; then
+            yes | "$SDKMAN" --licenses >/dev/null 2>&1 || true
+            "$SDKMAN" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          fi
 
       - name: Установить зависимости
         run: npm install

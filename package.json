@@ -1,0 +1,17 @@
+{
+  "name": "moy-zhivoy-akvarium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Мой живой аквариум — 3D-симулятор аквариума для Android",
+  "scripts": {
+    "serve": "npx --yes http-server www -p 8080 -c-1",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  }
+}

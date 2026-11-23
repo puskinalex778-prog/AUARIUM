@@ -1,0 +1,9 @@
+{
+  "appId": "ru.lopes.zhivoyakvarium",
+  "appName": "Мой живой аквариум",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#06121c",
+    "allowMixedContent": false
+  }
+}

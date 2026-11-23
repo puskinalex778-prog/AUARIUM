@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#06121c">
+  <title>Мой живой аквариум</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "./lib/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <!-- Заставка -->
+  <div id="splash" class="screen">
+    <div class="splash-inner">
+      <div class="logo"><img src="img/ui/inhabitants.png" alt="Мой живой аквариум"></div>
+      <h1>Мой живой аквариум</h1>
+      <p class="sub">Уютный аквариум, о котором приятно заботиться</p>
+      <button id="btnStart" class="big-btn" disabled>Загрузка…</button>
+    </div>
+  </div>
+
+  <!-- Кат-сцена -->
+  <div id="intro" class="hidden">
+    <div id="introFade"></div>
+    <div id="caption"></div>
+    <div id="thermo" class="hidden"><div class="thermo-label">🌡️ Выравниваем температуру</div><div class="bar"><i></i></div></div>
+    <button id="btnSkip">Пропустить ⏭</button>
+  </div>
+
+  <!-- Игровой интерфейс -->
+  <div id="hud" class="hidden">
+    <div id="topLeft">
+      <div class="pill" id="coins"><img class="pill-ic" src="img/ui/coin.png" alt=""><b>0</b></div>
+      <div class="pill" id="foodLeft"><img class="pill-ic" src="img/food/flakes.png" alt=""><b>0</b></div>
+      <div class="pill clock" id="clock">☀️</div>
+      <button class="pill clickable hidden" id="tankPill" title="Переключить аквариум"></button>
+    </div>
+    <div id="waterPanel" class="pill-col"></div>
+    <div id="toolHint" class="hidden"><span id="toolHintText"></span><button id="toolExit">✋ Смотреть</button></div>
+    <div id="toolbar">
+      <button data-act="feed"><span><img src="img/ui/feed.png" alt=""></span>Корм</button>
+      <button data-act="shop"><span><img src="img/ui/shop.png" alt=""></span>Магазин</button>
+      <button data-act="clean"><span><img src="img/ui/sponge.png" alt=""></span>Уборка</button>
+      <button data-act="equip"><span><img src="img/ui/equip.png" alt=""></span>Оборудование</button>
+      <button data-act="fish"><span><img src="img/ui/inhabitants.png" alt=""></span>Обитатели</button>
+      <button data-act="tasks"><span><img src="img/ui/tasks.png" alt=""></span>Задания<i class="badge hidden" id="taskBadge"></i></button>
+      <button data-act="settings"><span><img src="img/ui/settings.png" alt=""></span>Настройки</button>
+    </div>
+    <div id="sideBtns">
+      <button id="btnObserve" title="Режим наблюдения">👁️</button>
+      <button id="btnPhoto" title="Фоторежим"><img src="img/ui/photo.png" alt="Фото"></button>
+    </div>
+  </div>
+
+  <div id="placeBar" class="hidden">
+    <div id="placeInfo"></div>
+    <div class="row">
+      <button data-p="rotL">⟲</button><button data-p="rotR">⟳</button>
+      <button data-p="smaller">−</button><button data-p="bigger">＋</button>
+      <button data-p="cancel" class="ghost">Отмена</button>
+      <button data-p="store" class="ghost hidden">В инвентарь</button>
+      <button data-p="ok" class="primary">Поставить</button>
+    </div>
+  </div>
+
+  <div id="photoBar" class="hidden">
+    <button id="photoShot" class="shutter"></button>
+    <button id="photoExit">✕</button>
+  </div>
+  <button id="obsExit" class="hidden">Показать интерфейс</button>
+
+  <div id="fishLabel" class="hidden"></div>
+  <div id="ripples"></div>
+
+  <div id="panel" class="hidden">
+    <div class="panel-head"><h2 id="panelTitle"></h2><button id="panelClose">✕</button></div>
+    <div id="panelTabs"></div>
+    <div id="panelBody"></div>
+  </div>
+
+  <div id="dialog" class="hidden"><div class="dialog-box" id="dialogBox"></div></div>
+  <div id="toasts"></div>
+  <div id="tutorial" class="hidden"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

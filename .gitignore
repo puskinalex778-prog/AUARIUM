@@ -1,0 +1,4 @@
+node_modules/
+android/
+*.apk
+HANDOFF_PROMPT.md

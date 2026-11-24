@@ -43,10 +43,13 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Настроить экран (горизонтально, без засыпания)
+      - name: Настроить экран и разрешения уведомлений
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
           sed -i 's/android:name=".MainActivity"/android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"/' "$MANIFEST"
+          if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application|' "$MANIFEST"
+          fi
           cat "$MANIFEST"
 
       - name: Иконка приложения

@@ -519,7 +519,21 @@ export const TASKS = [
 ];
 export const DAILY_TASK = { id: 'daily', title: 'Ежедневный уход: покормить и проверить воду', reward: 15 };
 
-// Продолжительность жизни вида в реальных днях (при включённом естественном старении)
-export function lifespanDays(sp) {
-  return Math.round((sp?.adultDays || 4) * 4.5 + 10);
+export const LIFESPAN_PRESETS = [
+  [7, '1 неделя'],
+  [14, '2 недели'],
+  [30, '1 месяц'],
+  [60, '2 месяца'],
+  [180, 'Полгода'],
+  [365, '1 год'],
+  [0, '∞ Навсегда'],
+];
+
+// Продолжительность жизни вида в реальных днях с учётом выбранной настройки (baseDays: 7..365 или 0 = ∞)
+export function lifespanDays(sp, baseDays = 30) {
+  if (baseDays === 0) return Infinity;
+  const base = baseDays > 0 ? baseDays : 30;
+  // Лёгкий естественный коэффициент по виду (крупные рыбы и черепахи живут чуть дольше мелких)
+  const spFactor = Math.max(0.8, Math.min(1.35, 0.72 + (sp?.adultDays || 4) * 0.065));
+  return Math.max(3, Math.round(base * spFactor));
 }

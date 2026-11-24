@@ -82,12 +82,23 @@ h1 { margin: 8px 0 6px; font-size: clamp(28px, 5vw, 46px); letter-spacing: .5px;
 #toolbar button.pulse { animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(255, 207, 90, .55); background: rgba(255, 207, 90, .25); } }
 .badge { position: absolute; top: 2px; right: 8px; width: 10px; height: 10px; border-radius: 50%; background: var(--acc2); }
-#sideBtns { position: absolute; right: calc(12px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); display: flex; flex-direction: column; gap: 8px; }
-#sideBtns button { width: 48px; height: 48px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); font-size: 22px; display: flex; align-items: center; justify-content: center; }
-#sideBtns button img { width: 28px; height: 28px; object-fit: contain; }
-#toolHint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(92px + var(--safe-b)); background: var(--bg2);
-  border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 18px; display: flex; gap: 12px; align-items: center; font-size: 15px; }
-#toolHint button { background: rgba(255,255,255,.1); padding: 8px 14px; border-radius: 999px; }
+#sideBtns { position: absolute; right: calc(12px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); display: flex; flex-direction: column; gap: 8px; transition: bottom .2s; }
+#hud.tool-active #sideBtns { bottom: calc(14px + var(--safe-b)); }
+#sideBtns button { width: 46px; height: 46px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); font-size: 21px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); }
+#sideBtns button img { width: 26px; height: 26px; object-fit: contain; }
+#toolHint { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); background: var(--bg2);
+  border: 1px solid var(--line); border-radius: 18px; padding: 5px 6px 5px 10px; display: flex; gap: 8px; align-items: center; font-size: 13.5px;
+  backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,.35); max-width: calc(100vw - 82px); }
+#toolHint.picker-open { align-items: flex-end; padding: 8px; gap: 6px; border-radius: 18px; }
+#toolExit { width: 34px; height: 34px; min-width: 34px; padding: 0; border-radius: 50%; background: rgba(255,255,255,.14);
+  font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+#toolExit:active { transform: scale(.92); background: rgba(255,255,255,.24); }
+.tool-pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 600; padding: 2px 4px; }
+.tool-pill img { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+.tool-pill .tool-sub { color: var(--acc); font-variant-numeric: tabular-nums; font-weight: 700; }
+.tool-switch { background: rgba(79, 209, 197, .18); border: 1px solid rgba(79, 209, 197, .35); color: var(--txt);
+  padding: 5px 10px; border-radius: 999px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tool-switch:active { transform: scale(.95); }
 
 /* Размещение */
 #placeBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + var(--safe-b)); z-index: 12; background: var(--bg2);
@@ -201,16 +212,15 @@ input[type=range] { width: 160px; accent-color: var(--acc); }
 .toast.gold { border-color: rgba(255, 207, 90, .6); }
 @keyframes tin { from { transform: translateY(-12px); opacity: 0; } }
 @keyframes tout { to { transform: translateY(-10px); opacity: 0; } }
-#tutorial { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); bottom: calc(150px + var(--safe-b)); background: rgba(255, 207, 90, .95); color: #2a1d00;
-  padding: 12px 20px; border-radius: 18px; font-size: 17px; font-weight: 600; text-align: center; max-width: 90vw; box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; }
+#tutorial { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(58px + var(--safe-t)); background: rgba(255, 207, 90, .95); color: #2a1d00;
+  padding: 9px 16px; border-radius: 16px; font-size: 15px; font-weight: 600; text-align: center; max-width: min(86vw, 440px); box-shadow: 0 8px 24px rgba(0,0,0,.35); pointer-events: none; }
 
 @media (max-height: 460px) {
   #toolbar button { min-width: 56px; padding: 4px 6px; font-size: 10.5px; }
   #toolbar button span { font-size: 21px; }
   #waterPanel { font-size: 12px; padding: 6px 10px; min-width: 150px; }
   #sideBtns { bottom: calc(82px + var(--safe-b)); }
-  #toolHint { bottom: calc(80px + var(--safe-b)); }
-  #tutorial { bottom: calc(132px + var(--safe-b)); }
+  #tutorial { top: calc(50px + var(--safe-t)); font-size: 13.5px; padding: 7px 14px; }
 }
 @media (max-width: 640px) {
   #toolbar button { min-width: 0; flex: 1; }
@@ -220,9 +230,9 @@ input[type=range] { width: 160px; accent-color: var(--acc); }
 .bt-col { display: flex; gap: 6px; align-items: center; }
 .bt-row { display: flex; gap: 6px; align-items: center; }
 .btn.mini { padding: 8px 10px; font-size: 15px; line-height: 1; }
-.feed-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.feed-chips .chip { padding: 6px 11px; font-size: 13px; }
-#toolHint { max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+.feed-chips { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+.feed-chips .chip { padding: 7px 12px; font-size: 13px; display: flex; align-items: center; gap: 6px; text-align: left; white-space: nowrap; }
+.feed-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--muted); padding: 0 4px 2px; }
 
 .bio-head { display: flex; align-items: center; gap: 14px; text-align: left; margin-bottom: 12px; }
 .bio-head .em { font-size: 44px; line-height: 1; }

@@ -13,9 +13,10 @@ import { CameraRig } from './camera.js';
 import { AudioSys } from './audio.js';
 import { Intro } from './intro.js';
 import { loadState, saveState, newState, curTank, allFish, loadAlbum, saveAlbum } from './save.js';
-import { simulate, catchUp, timeOfDay, autoLamp, waterQuality, qualityLabel } from './sim.js';
+import { simulate, catchUp, timeOfDay, autoLamp, waterQuality, qualityLabel, effectiveLifespan } from './sim.js';
 import { $, h, toast, nameDialog, dialogOpen, closeDialog, Panel } from './ui.js';
 import { Panels } from './panels.js';
+import { requestNotifPermission, clearNotifications, scheduleNotifications } from './notify.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -75,6 +76,7 @@ class Game {
     this.raycaster = new THREE.Raycaster();
     this.tool = 'view';
     this.feedType = 'flakes';
+    this.feedPickerOpen = false;
     this.knockTimes = [];
 
     this.audio = new AudioSys();
@@ -130,9 +132,10 @@ class Game {
   }
 
   makePet(rec) {
-    if (rec.species === 'crab') return new Crab(rec, this.tank.tankGroup, true);
-    if (rec.species === 'newt' || rec.species === 'musk_turtle' || rec.species === 'mudskipper') return new Amphibian(rec, this.tank.tankGroup, true);
-    return new Fish(rec, this.tank.tankGroup, true);
+    const bl = effectiveLifespan(this.state.settings);
+    if (rec.species === 'crab') return new Crab(rec, this.tank.tankGroup, true, bl);
+    if (rec.species === 'newt' || rec.species === 'musk_turtle' || rec.species === 'mudskipper') return new Amphibian(rec, this.tank.tankGroup, true, bl);
+    return new Fish(rec, this.tank.tankGroup, true, bl);
   }
 
   // Переключиться на другой купленный аквариум
@@ -209,7 +212,8 @@ class Game {
     this.scaleAcc += dt;
     if (this.scaleAcc > 25) {
       this.scaleAcc = 0;
-      for (const f of this.fishes) f.updateScale();
+      const bl = effectiveLifespan(st.settings);
+      for (const f of this.fishes) f.updateScale(bl);
     }
 
     // питомцы (рыбки, сомики, обитатели берега)
@@ -228,7 +232,7 @@ class Game {
       onEat: (f, b) => this.onFishEat(f, b),
     };
     for (const f of this.fishes) f.update(ctx);
-    this.food.update(dt, this.tank.waterTop, G.uCurrent.value, this.time);
+    this.food.update(dt, this.tank.waterTop, G.uCurrent.value, this.time, this.tool === 'net');
     const chests = tk.decor.filter(d => d.type === 'chest').map(d => ({ x: d.x, y: groundY(d.x, d.z) + 0.32, z: d.z }));
     this.tank.updateBubbles(dt, tk.equip.compressorOn, chests);
     const turb = clamp((tk.water.waste - 25) / 75, 0, 1);
@@ -352,7 +356,12 @@ class Game {
   feedAt(ray) {
     const st = this.state;
     const ft = this.feedType || 'flakes';
-    if ((st.food[ft] || 0) <= 0) { toast(`Этот корм закончился — выбери другой или загляни в магазин 🛒`); return; }
+    if ((st.food[ft] || 0) <= 0) {
+      this.feedPickerOpen = true;
+      this.renderToolHint();
+      toast('Этот корм закончился — выбери другой или загляни в магазин 🛒');
+      return;
+    }
     const box = new THREE.Box3(new THREE.Vector3(TANK.minX, 0, TANK.minZ), new THREE.Vector3(TANK.maxX, TANK.height || 3.6, TANK.maxZ));
     const a = new THREE.Vector3();
     if (!ray.intersectBox(box, a)) { toast('Коснись воды или берега в аквариуме'); return; }
@@ -363,6 +372,7 @@ class Game {
     const allFull = this.fishes.length && this.fishes.every(f => f.rec.satiety > 85);
     if (allFull) toast('Питомцы сыты 🙂 Лишний корм опустится на дно и загрязнит воду');
     st.food[ft]--;
+    this.feedPickerOpen = st.food[ft] <= 0;
     this.food.drop(m.x, clamp(m.z, TANK.minZ + 0.3, TANK.maxZ - 0.3), this.tank.waterTop, ft);
     if (ft === 'tablets') this.audio.plop(); else this.audio.splash();
     if (this.tutorialStep === 1) this.setTutorial(2);
@@ -373,9 +383,16 @@ class Game {
   netAt(ray) {
     const p = this.groundHit(ray);
     if (!p) return;
-    const n = this.food.collect(p.x, p.z, 0.65);
-    if (n) { toast(`Собрано остатков корма: ${n}`); this.audio.click(); }
-    else toast('Здесь чисто. Остатки корма — маленькие хлопья на дне');
+    const n = this.food.collect(p.x, p.z, 0.95);
+    if (n) {
+      this.audio.click();
+      this.renderToolHint();
+      toast(this.food.onBottom === 0 ? 'Дно полностью очищено от корма! ✨' : `Собрано остатков корма: ${n}`);
+    } else {
+      toast(this.food.onBottom > 0
+        ? 'Проведи пальцем по подсвеченным крошкам на дне'
+        : 'На дне уже чисто ✨');
+    }
   }
 
   glassHitUV(ray) {
@@ -452,7 +469,14 @@ class Game {
       this.placeDrag(ray);
     } else if (this.tool === 'net') {
       const p = this.groundHit(ray);
-      if (p) { const n = this.food.collect(p.x, p.z, 0.5); if (n) this.audio.click(); }
+      if (p) {
+        const n = this.food.collect(p.x, p.z, 0.75);
+        if (n) {
+          this.audio.click();
+          this.renderToolHint();
+          if (this.food.onBottom === 0) toast('Дно полностью очищено от корма! ✨');
+        }
+      }
     }
   }
 
@@ -522,40 +546,95 @@ class Game {
   renderToolHint() {
     const hint = $('#toolHint');
     const txt = $('#toolHintText');
+    if (this.tool === 'view' || this.tool === 'place') {
+      hint.classList.add('hidden');
+      hint.classList.remove('picker-open');
+      return;
+    }
+    const shortFood = (id) => id === 'flakes' ? 'Хлопья' : id === 'granules' ? 'Гранулы' : 'Таблетки';
     if (this.tool === 'feed') {
       const st = this.state;
       txt.innerHTML = '';
-      const wrap = h('div', { class: 'feed-chips' });
-      for (const [id, f] of Object.entries(FOOD_ITEMS)) {
-        const cnt = st.food[id] || 0;
-        const short = id === 'flakes' ? 'Хлопья' : id === 'granules' ? 'Гранулы' : 'Таблетки';
-        wrap.append(h('button', {
-          class: 'chip' + (this.feedType === id ? ' on' : ''),
-          onclick: (e) => { e.stopPropagation(); this.feedType = id; this.audio.click(); this.renderToolHint(); this.updateHud(); },
-        }, h('img', { src: `img/food/${id}.png`, class: 'chip-ic', alt: '' }), `${short} (${cnt})`));
+      if (this.feedPickerOpen) {
+        hint.classList.add('picker-open');
+        const wrap = h('div', { class: 'feed-chips' });
+        wrap.append(h('div', { class: 'feed-picker-head' }, 'Выбери корм:'));
+        for (const id of Object.keys(FOOD_ITEMS)) {
+          const cnt = st.food[id] || 0;
+          wrap.append(h('button', {
+            class: 'chip' + (this.feedType === id ? ' on' : ''),
+            onclick: (e) => {
+              e.stopPropagation();
+              this.feedType = id;
+              this.feedPickerOpen = false;
+              this.audio.click();
+              this.renderToolHint();
+              this.updateHud();
+              if (!this.tutorialStep) toast(`Выбрано: ${shortFood(id)} — коснись воды`, { life: 2.2 });
+            },
+          }, h('img', { src: `img/food/${id}.png`, class: 'chip-ic', alt: '' }), `${shortFood(id)} (${cnt})`));
+        }
+        txt.append(wrap);
+      } else {
+        hint.classList.remove('picker-open');
+        const ft = this.feedType || 'flakes';
+        const cnt = st.food[ft] || 0;
+        txt.append(h('button', {
+          class: 'tool-switch',
+          title: 'Сменить корм',
+          onclick: (e) => { e.stopPropagation(); this.feedPickerOpen = true; this.audio.click(); this.renderToolHint(); },
+        }, h('img', { src: `img/food/${ft}.png`, class: 'chip-ic', alt: '' }), `${shortFood(ft)} · ${cnt} ▾`));
       }
-      txt.append(wrap);
       hint.classList.remove('hidden');
       return;
     }
-    const hints = {
-      sponge: '🧽 Води пальцем по переднему стеклу (мягкий налёт)',
-      scraper: '🪒 Счищай стойкие тёмные пятна на переднем стекле',
-      siphon: '🌀 Веди трубкой сифона по грунту, чтобы собрать осадок',
-      net: '🥅 Коснись остатков корма на дне',
-      arrange: '✋ Коснись предмета, чтобы переставить',
-    };
-    hint.classList.toggle('hidden', !hints[this.tool]);
-    txt.textContent = hints[this.tool] || '';
+
+    hint.classList.remove('picker-open');
+    txt.innerHTML = '';
+    const tk = curTank(this.state);
+    const glass = Math.round((1 - this.algae.level()) * 100);
+    const meta = {
+      sponge:  { img: 'img/ui/sponge.png',  label: 'Губка',  sub: `${glass}%` },
+      scraper: { img: 'img/ui/scraper.png', label: 'Скребок', sub: `${glass}%` },
+      siphon:  { img: 'img/ui/siphon.png',  label: 'Сифон',  sub: `${(tk.detritus || []).length}` },
+      net:     { img: 'img/ui/net.png',     label: 'Сачок',  sub: `${this.food.onBottom}` },
+      arrange: { img: null,                 label: '✋ Перестановка', sub: '' },
+    }[this.tool];
+    if (!meta) { hint.classList.add('hidden'); return; }
+    const pill = h('span', { class: 'tool-pill' },
+      meta.img ? h('img', { src: meta.img, alt: '' }) : null,
+      meta.label,
+      meta.sub !== '' ? h('span', { class: 'tool-sub' }, `· ${meta.sub}`) : null);
+    txt.append(pill);
+    hint.classList.remove('hidden');
   }
 
   setTool(tool) {
     if (this.tool === 'siphon') this.tank.setSiphonPos(0, 0, false);
     $('#ripples .sponge')?.remove();
+    const prev = this.tool;
     this.tool = tool;
+    if (tool === 'feed') this.feedPickerOpen = true;
+    else this.feedPickerOpen = false;
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.toggle('active', b.dataset.act === 'feed' && tool === 'feed'));
+    $('#hud').classList.toggle('tool-active', tool !== 'view');
+    if (tool !== 'place') {
+      $('#placeBar').classList.add('hidden');
+      $('#toolbar').classList.toggle('hidden', tool !== 'view');
+    }
     this.renderToolHint();
-    if (tool !== 'place') { $('#placeBar').classList.add('hidden'); $('#toolbar').classList.remove('hidden'); }
+    if (tool !== prev && tool !== 'view' && tool !== 'place' && tool !== 'feed') {
+      const tips = {
+        sponge: 'Води пальцем по переднему стеклу, чтобы снять мягкий налёт',
+        scraper: 'Счищай тёмные пятна на переднем стекле',
+        siphon: 'Веди трубкой сифона по дну, чтобы собрать осадок',
+        net: this.food.onBottom > 0
+          ? 'Коснись или проведи по подсвеченным остаткам корма на дне'
+          : 'На дне сейчас нет остатков корма ✨',
+        arrange: 'Коснись предмета в аквариуме, чтобы переставить',
+      };
+      if (tips[tool]) toast(tips[tool], { life: 2.6 });
+    }
     this.updateTutorialVisibility();
   }
 
@@ -586,7 +665,7 @@ class Game {
     for (const p of ev.pregnant || []) {
       if (p.tankId === activeId) {
         const f = this.fishes.find(x => x.rec === p.female);
-        if (f) f.updateScale();
+        if (f) f.updateScale(effectiveLifespan(this.state.settings));
         if (!fromCatchUp) toast(`${this.displayName(p.female)} скоро станет мамой! 🤰`);
       }
     }
@@ -877,6 +956,9 @@ class Game {
       this.lastLeftoverHint = this.time;
       toast('На дне много остатков корма — их можно собрать сачком или сифоном (Уборка)');
     }
+    if (this.tool !== 'view' && this.tool !== 'place' && !(this.tool === 'feed' && this.feedPickerOpen)) {
+      this.renderToolHint();
+    }
     if (this.panel.current === 'card' && this.selected) this.panels.refreshCard();
   }
 
@@ -965,6 +1047,8 @@ class Game {
       if (away > 6) toast(`С возвращением! Питомцы рады тебя видеть 🐠`, { life: 4 });
     }
     this.updateHud();
+    clearNotifications();
+    if (st.settings.notifications !== false) requestNotifPermission();
   }
 
   save() {
@@ -995,7 +1079,7 @@ class Game {
       const next = list[(list.indexOf(this.state.activeTank) + 1) % list.length];
       this.switchTank(next);
     });
-    $('#toolExit').addEventListener('click', () => { this.setTool('view'); if (this.tutorialStep === 2) this.setTutorial(1); });
+    $('#toolExit').addEventListener('click', () => { this.audio.click(); this.setTool('view'); if (this.tutorialStep === 2) this.setTutorial(1); });
     $('#placeBar').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { this.audio.click(); this.placeAction(b.dataset.p); } });
     $('#btnObserve').addEventListener('click', () => { this.setMode('observe'); toast('Режим наблюдения. Кнопка вверху справа вернёт интерфейс'); });
     $('#btnPhoto').addEventListener('click', () => this.setMode('photo'));
@@ -1005,17 +1089,23 @@ class Game {
     $('#dialog').addEventListener('pointerdown', (e) => e.stopPropagation());
 
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { this.save(); this.audio.suspend(); this.paused = true; }
-      else {
+      if (document.hidden) {
+        this.save();
+        scheduleNotifications(this.state);
+        this.audio.suspend();
+        this.paused = true;
+      } else {
+        clearNotifications();
         const ev = catchUp(this.state, this.algae); this.checkDay();
-        this.fishes.forEach(f => f.updateScale());
+        const bl = effectiveLifespan(this.state.settings);
+        this.fishes.forEach(f => f.updateScale(bl));
         this.tank.updateDetritus(curTank(this.state).detritus);
         this.tank.updateClutches(curTank(this.state).clutches);
         this.handleSimEvents(ev, true);
         this.clock.getDelta(); this.paused = false; this.audio.resume(); this.updateHud();
       }
     });
-    addEventListener('pagehide', () => this.save());
+    addEventListener('pagehide', () => { this.save(); scheduleNotifications(this.state); });
 
     // Кнопка «Назад» на Android
     const App = window.Capacitor?.Plugins?.App;
@@ -1026,7 +1116,7 @@ class Game {
       if (this.mode) { this.setMode(null); return; }
       if (this.tool !== 'view') { this.setTool('view'); return; }
       if (this.rig.follow) { this.setFollow(null); return; }
-      this.save(); App.minimizeApp();
+      this.save(); scheduleNotifications(this.state); App.minimizeApp();
     });
     this.panel.onClose = () => { this.selected = null; this.updateTutorialVisibility(); };
   }

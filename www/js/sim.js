@@ -42,10 +42,16 @@ export function qualityLabel(q) {
   return ['Плохо', 'bad'];
 }
 
+export function effectiveLifespan(settings) {
+  if (!settings || !settings.aging) return 0;
+  return settings.lifespanDays > 0 ? settings.lifespanDays : 0;
+}
+
 // Стадии жизненного цикла: малёк → молодая → взрослая → пожилая
-export function lifeStage(rec, sp, now = Date.now()) {
-  const adultD = sp?.adultDays || 4;
-  const maxD = lifespanDays(sp);
+export function lifeStage(rec, sp, now = Date.now(), baseLifespan = 0) {
+  const maxD = lifespanDays(sp, baseLifespan);
+  // При коротком сроке жизни (например 1 неделя) взросление пропорционально ускоряется
+  const adultD = Number.isFinite(maxD) ? Math.min(sp?.adultDays || 4, Math.max(1.2, maxD * 0.28)) : (sp?.adultDays || 4);
   const ageDays = Math.max(0, (now - (rec.bornAt || now)) / 86400000 + (rec.bonusDays || 0));
   const fryEnd = adultD * 0.35;
   if (rec.isFry && ageDays < fryEnd) {
@@ -58,7 +64,7 @@ export function lifeStage(rec, sp, now = Date.now()) {
     const t = clamp((ageDays - baseD) / Math.max(0.4, adultD - baseD), 0, 1);
     return { key: 'young', label: 'Молодая', growth: startG + (1 - startG) * t, ageDays, maxDays: maxD, isFry: false, isAdult: false, isElder: false };
   }
-  if (ageDays < maxD * 0.78) {
+  if (!Number.isFinite(maxD) || ageDays < maxD * 0.78) {
     return { key: 'adult', label: 'Взрослая', growth: 1.0, ageDays, maxDays: maxD, isFry: false, isAdult: true, isElder: false };
   }
   return { key: 'elder', label: 'Пожилая', growth: 1.0, ageDays, maxDays: maxD, isFry: false, isAdult: false, isElder: true };
@@ -140,6 +146,7 @@ export function simulateTank(tank, spec, state, dtH, opts = {}) {
     algae.grow(dtH, rate);
   }
 
+  const baseLife = effectiveLifespan(state.settings);
   // Самочувствие и ускоренный рост мальков в выростном отсеке
   const q = waterQuality(tank);
   const cap = spec.capacity;
@@ -147,14 +154,14 @@ export function simulateTank(tank, spec, state, dtH, opts = {}) {
   let fryCount = 0;
   tank.fish.forEach(f => {
     counts[f.species] = (counts[f.species] || 0) + 1;
-    if (lifeStage(f, SPECIES[f.species], now).isFry) fryCount++;
+    if (lifeStage(f, SPECIES[f.species], now, baseLife).isFry) fryCount++;
   });
   const hides = (tank.decor || []).filter(d => ['grotto', 'ceramic', 'wood', 'ship', 'moss', 'castle', 'ruins', 'pagoda'].includes(d.type)).length;
 
   for (const f of tank.fish) {
     const sp = SPECIES[f.species];
     if (!sp) continue;
-    const stg = lifeStage(f, sp, now);
+    const stg = lifeStage(f, sp, now, baseLife);
     if (spec.isNursery && stg.isFry) {
       f.bonusDays = (f.bonusDays || 0) + (dtH / 24) * ((spec.growthMul || 1.5) - 1);
     }
@@ -248,7 +255,7 @@ export function simulateTank(tank, spec, state, dtH, opts = {}) {
       for (const f of tank.fish) {
         const sp = SPECIES[f.species];
         if (!sp) continue;
-        const stg = lifeStage(f, sp, now);
+        const stg = lifeStage(f, sp, now, baseLife);
         if (!stg.isAdult || f.health < 72 || f.satiety < 45 || f.stress > 45) continue;
         if ((f.breedCooldown || 0) > now || f.pregnantUntil) continue;
         (bySp[f.species] ||= { m: [], f: [] })[f.sex].push(f);
@@ -291,14 +298,14 @@ export function simulateTank(tank, spec, state, dtH, opts = {}) {
     }
   }
 
-  // ---------- Деликатное естественное старение (только если включено и НЕ комфортный режим) ----------
-  if (state.settings.aging && !comfort && !opts.departedOnce) {
+  // ---------- Деликатное естественное старение (только если включено, НЕ комфортный режим и срок жизни конечный) ----------
+  if (state.settings.aging && !comfort && baseLife !== 0 && !opts.departedOnce) {
     for (let i = 0; i < tank.fish.length; i++) {
       const f = tank.fish[i];
       const sp = SPECIES[f.species];
       if (!sp) continue;
-      const stg = lifeStage(f, sp, now);
-      if (stg.ageDays >= stg.maxDays && Math.random() < 0.25 * dtH) {
+      const stg = lifeStage(f, sp, now, baseLife);
+      if (Number.isFinite(stg.maxDays) && stg.ageDays >= stg.maxDays && Math.random() < 0.25 * dtH) {
         tank.fish.splice(i, 1);
         const mem = {
           id: f.id, name: f.name || sp.name, species: f.species, sex: f.sex, variant: f.variant,

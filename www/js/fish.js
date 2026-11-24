@@ -13,7 +13,7 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Ve
 const mtx = new THREE.Matrix4(), q = new THREE.Quaternion();
 
 export class Fish {
-  constructor(rec, root, shadows) {
+  constructor(rec, root, shadows, baseLifespan = 0) {
     this.rec = rec;
     this.sp = SPECIES[rec.species];
     const m = makeFishMesh(rec.species, rec.variant, rec.sex, shadows);
@@ -46,13 +46,13 @@ export class Fish {
     this.lastHeart = 0;
     this.isElder = false;
     this.isFry = false;
-    this.updateScale();
+    this.updateScale(baseLifespan);
   }
 
   get size() { return this.sp.length * this.growth; }
 
-  updateScale() {
-    const stg = lifeStage(this.rec, this.sp);
+  updateScale(baseLifespan = 0) {
+    const stg = lifeStage(this.rec, this.sp, Date.now(), baseLifespan);
     this.growth = stg.growth;
     this.stage = stg.label;
     this.isFry = stg.isFry;
@@ -380,7 +380,7 @@ export class Fish {
 
 // ================= ОБИТАТЕЛИ АКВАТЕРРАРИУМА: ТРИТОН, ЧЕРЕПАХА, ИЛИСТЫЙ ПРЫГУН =================
 export class Amphibian {
-  constructor(rec, root, shadows) {
+  constructor(rec, root, shadows, baseLifespan = 0) {
     this.isAmphibian = true;
     this.rec = rec;
     this.sp = SPECIES[rec.species];
@@ -412,13 +412,13 @@ export class Amphibian {
     this.hopY = 0;
     this.fear = 0;
     this.lastEat = 0;
-    this.updateScale();
+    this.updateScale(baseLifespan);
   }
 
   get size() { return this.sp.length * this.growth; }
 
-  updateScale() {
-    const stg = lifeStage(this.rec, this.sp);
+  updateScale(baseLifespan = 0) {
+    const stg = lifeStage(this.rec, this.sp, Date.now(), baseLifespan);
     this.growth = stg.growth;
     this.stage = stg.label;
     this.isFry = stg.isFry;
@@ -606,7 +606,7 @@ export class Amphibian {
 
 // ================= ПРЕСНОВОДНЫЙ КРАБИК (АКВАТЕРРАРИУМ) =================
 export class Crab {
-  constructor(rec, root, shadows) {
+  constructor(rec, root, shadows, baseLifespan = 0) {
     this.isCrab = true;
     this.rec = rec;
     this.sp = SPECIES.crab;
@@ -632,13 +632,13 @@ export class Crab {
     this.fear = 0;
     this.lastEat = 0;
     this.stepTick = 0;
-    this.updateScale();
+    this.updateScale(baseLifespan);
   }
 
   get size() { return this.sp.length * this.growth; }
 
-  updateScale() {
-    const stg = lifeStage(this.rec, this.sp);
+  updateScale(baseLifespan = 0) {
+    const stg = lifeStage(this.rec, this.sp, Date.now(), baseLifespan);
     this.growth = stg.growth;
     this.stage = stg.label;
     this.isFry = stg.isFry;

@@ -1,11 +1,12 @@
 // Содержимое панелей: магазин (27 видов, корма, декор, аквариумы), энциклопедия видов в природе,
 // уборка (губка, скребок, сифон, мини-игра промывки фильтра, сачок, подмена воды),
 // оборудование (с регулировкой нагревателя), обитатели (карточка, пересадка, альбом), задания, настройки.
-import { SPECIES, TANKS, DECOR, BACKGROUNDS, GROUNDS, LIGHT_COLORS, UPGRADES, FOOD_ITEMS, TASKS, DAILY_TASK } from './data.js';
+import { SPECIES, TANKS, DECOR, BACKGROUNDS, GROUNDS, LIGHT_COLORS, UPGRADES, FOOD_ITEMS, TASKS, DAILY_TASK, LIFESPAN_PRESETS } from './data.js';
 import { SPECIES_BIO, SEX_DIFF } from './bio.js';
-import { purchaseWarnings, bioload, waterQuality, qualityLabel, timeOfDay, lifeStage } from './sim.js';
+import { purchaseWarnings, bioload, waterQuality, qualityLabel, timeOfDay, lifeStage, effectiveLifespan } from './sim.js';
 import { h, toast, confirmDialog, sw, statBar, showDialog, closeDialog } from './ui.js';
 import { curTank, newTankState, saveAlbum, wipe } from './save.js';
+import { requestNotifPermission, clearNotifications } from './notify.js';
 
 const spImg = (id, alt = '') => h('img', { src: `img/species/${id}.png`, alt });
 const decImg = (id, alt = '') => h('img', { src: `img/decor/${id}.png`, alt });
@@ -408,9 +409,10 @@ export class Panels {
     }
 
     if (!g.fishes.length) b.append(h('p', { class: 'section-note' }, `В «${spec.name}» пока никого нет. Загляни в Магазин!`));
+    const baseLife = effectiveLifespan(st.settings);
     for (const f of g.fishes) {
       const r = f.rec, sp = SPECIES[r.species];
-      const stg = lifeStage(r, sp);
+      const stg = lifeStage(r, sp, Date.now(), baseLife);
       const badge = r.pregnantUntil > Date.now() ? ' 🤰' : stg.isFry ? ' 🍼' : stg.isElder ? ' ✨' : '';
       const infoBtn = h('button', { class: 'btn sec mini', title: 'О виде в природе', onclick: (e) => { e.stopPropagation(); this.showSpeciesBio(r.species); } }, '📖');
       b.append(h('div', { class: 'item', onclick: () => g.openFishCard(f), style: 'cursor:pointer' },
@@ -429,8 +431,11 @@ export class Panels {
   renderCard(b) {
     const g = this.g, f = this.cardFish; if (!f) return;
     const r = f.rec, sp = SPECIES[r.species];
-    const stg = lifeStage(r, sp);
+    const baseLife = effectiveLifespan(g.state.settings);
+    const stg = lifeStage(r, sp, Date.now(), baseLife);
     const days = Math.floor(stg.ageDays);
+    const ageStr = (days < 1 ? 'меньше дня' : `${days} дн.`)
+      + (Number.isFinite(stg.maxDays) && !g.state.settings.comfort ? ` (до ~${stg.maxDays} дн.)` : '');
     b.append(h('div', { class: 'card-head' }, h('div', { class: 'em' }, spImg(r.species, sp.name)), h('div', {}, h('h3', {}, g.displayName(r)), h('small', {}, `${sp.name} · ${sp.latin}`))));
     if (r.pregnantUntil && r.pregnantUntil > Date.now()) {
       const mins = Math.max(1, Math.ceil((r.pregnantUntil - Date.now()) / 60000));
@@ -451,7 +456,7 @@ export class Panels {
       famRows.push(h('span', {}, 'Потомство'), h('span', {}, `${fam.children.length} мал.`));
     }
     b.append(h('div', { class: 'kv' },
-      h('span', {}, 'Возраст'), h('span', {}, days < 1 ? 'меньше дня' : `${days} дн.`),
+      h('span', {}, 'Возраст'), h('span', {}, ageStr),
       h('span', {}, 'Стадия'), h('span', {}, stg.label),
       h('span', {}, 'Пол'), h('span', {}, r.sex === 'm' ? '♂ Самец' : '♀ Самка'),
       h('span', {}, 'Любимый корм'), h('span', {}, sp.favorite),
@@ -491,7 +496,7 @@ export class Panels {
 
   async moveFishDialog(fish, otherTanks) {
     const g = this.g, st = g.state;
-    const isFry = lifeStage(fish.rec, SPECIES[fish.rec.species]).isFry;
+    const isFry = lifeStage(fish.rec, SPECIES[fish.rec.species], Date.now(), effectiveLifespan(st.settings)).isFry;
     const targetId = await showDialog(box => {
       box.append(h('h3', {}, `Пересадить: ${g.displayName(fish.rec)}`));
       box.append(h('p', {}, 'Выбери аквариум назначения:'));
@@ -546,7 +551,43 @@ export class Panels {
     b.append(h('p', { class: 'section-note' }, 'Комфортный режим подходит детям и для спокойного наблюдения.'));
     b.append(row('💕 Ухаживание и сердечки', sw(s.courtship !== false, v => { s.courtship = v; g.save(); })));
     b.append(row('🥚 Размножение и мальки', sw(s.breeding !== false, v => { s.breeding = v; g.save(); toast(v ? 'Взрослые пары смогут заводить потомство в чистом просторном аквариуме' : 'Размножение поставлено на паузу'); })));
-    b.append(row('⏳ Старение и естественная смерть', sw(!!s.aging, v => { s.aging = v; g.save(); toast(v ? 'Пожилые питомцы со временем будут бережно переходить в Памятный альбом (в комфортном режиме не действует)' : 'Питомцы остаются с тобой навсегда'); })));
+
+    const curLife = effectiveLifespan(s);
+    const lifeChips = h('div', { class: 'chips' });
+    for (const [days, label] of LIFESPAN_PRESETS) {
+      lifeChips.append(h('button', {
+        class: 'chip' + (curLife === days ? ' on' : ''),
+        onclick: () => {
+          s.lifespanDays = days;
+          s.aging = days > 0;
+          g.fishes.forEach(f => f.updateScale(days));
+          g.save();
+          g.panel.refresh();
+          toast(days === 0
+            ? 'Питомцы не стареют и остаются с тобой навсегда ∞'
+            : `Срок жизни рыбок: ${label}. Пожилые питомцы бережно переходят в Памятный альбом 🕯️`);
+        },
+      }, label));
+    }
+    b.append(h('div', { class: 'row2', style: 'display:block' },
+      h('label', {}, '⏳ Срок жизни рыбок'),
+      h('div', { style: 'margin-top:8px' }, lifeChips)));
+    b.append(h('p', { class: 'section-note' },
+      curLife === 0
+        ? 'Питомцы растут до взрослого размера и живут с тобой бесконечно.'
+        : 'Срок жизни зависит от вида (крупные виды живут чуть дольше). В комфортном режиме старение на паузе.'));
+
+    b.append(row('🔔 Уведомления об уходе', sw(s.notifications !== false, async v => {
+      s.notifications = v;
+      if (v) {
+        await requestNotifPermission();
+        toast('Уведомления включены: мягко напомним покормить питомцев и забрать награды 🔔');
+      } else {
+        await clearNotifications();
+        toast('Уведомления отключены');
+      }
+      g.save();
+    })));
     b.append(row('🔬 Подробные показатели воды', sw(s.advanced, v => { s.advanced = v; g.save(); g.updateHud(); })));
     b.append(row('🎨 Творческий режим', sw(!!s.creative, v => { s.creative = v; g.save(); toast(v ? 'Творческий режим: магазин не проверяет совместимость. Это игровая условность — в настоящем аквариуме так нельзя' : 'Проверки совместимости снова включены'); })));
     b.append(h('div', { class: 'btn-row' },

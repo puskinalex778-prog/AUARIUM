@@ -91,6 +91,7 @@ export function newState() {
       music: 0.45, sfx: 0.8, quality: 'medium', fps: 60,
       comfort: false, advanced: false, creative: false,
       courtship: true, breeding: true, aging: false,
+      lifespanDays: 0, notifications: true,
     },
     memorial: [],
     stats: { knocks: 0, photos: 0, fedTotal: 0, bornTotal: 0 },

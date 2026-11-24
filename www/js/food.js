@@ -13,6 +13,7 @@ export class Food {
     this.root = root;
     const geo = new THREE.CylinderGeometry(0.046, 0.046, 0.016, 8);
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.78 });
+    this.mat = mat;
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
@@ -108,7 +109,15 @@ export class Food {
     return n;
   }
 
-  update(dt, top, current, time) {
+  update(dt, top, current, time, highlightBottom = false) {
+    if (this.mat) {
+      if (highlightBottom) {
+        this.mat.emissive.setHex(0xffb830);
+        this.mat.emissiveIntensity = 0.45 + 0.35 * Math.sin(time * 5.5);
+      } else {
+        this.mat.emissiveIntensity = 0;
+      }
+    }
     for (let i = this.p.length - 1; i >= 0; i--) {
       const f = this.p[i];
       f.age += dt;
@@ -142,13 +151,14 @@ export class Food {
         this._e.set(flat ? 0 : f.rx, f.ry, 0);
         this._q.setFromEuler(this._e);
         this._v.set(f.x, f.y, f.z);
+        const hiMul = (highlightBottom && f.st === 2) ? 1.8 : 1.0;
         if (f.type === 'tablets') {
           const b = 0.7 + 0.25 * (f.bites || 1);
-          this._s.set(1.55 * b, 2.2, 1.55 * b);
+          this._s.set(1.55 * b * hiMul, 2.2 * hiMul, 1.55 * b * hiMul);
         } else if (f.type === 'granules') {
-          this._s.set(0.75, 2.1, 0.75);
+          this._s.set(0.75 * hiMul, 2.1 * hiMul, 0.75 * hiMul);
         } else {
-          this._s.set(1.0, 0.45, 1.0);
+          this._s.set(1.0 * hiMul, 0.45 * hiMul, 1.0 * hiMul);
         }
         this._c.setHex(f.col || 0xd9692c);
         this.mesh.setColorAt(i, this._c);

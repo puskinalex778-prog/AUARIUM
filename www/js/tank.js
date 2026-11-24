@@ -53,16 +53,34 @@ export class Tank {
     g.add(floor);
 
     const wallTex = canvasTex(512, 512, (c, w, h) => {
-      c.fillStyle = '#c9b9a2'; c.fillRect(0, 0, w, h);
-      for (let x = 0; x < w; x += 64) { c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(x, 0, 32, h); }
-      for (let i = 0; i < 3000; i++) { c.fillStyle = `rgba(90,70,50,${Math.random() * 0.06})`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+      c.fillStyle = '#cfc1ab'; c.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 64) { c.fillStyle = 'rgba(255,255,255,0.065)'; c.fillRect(x, 0, 32, h); }
+      for (let i = 0; i < 3000; i++) { c.fillStyle = `rgba(90,70,50,${Math.random() * 0.055})`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
     });
-    wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(5, 2);
-    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.95 });
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(50, 18), wallMat);
-    wall.position.set(0, 4.5, -5.2); wall.receiveShadow = true; g.add(wall);
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(36, 18), wallMat);
-    side.rotation.y = Math.PI / 2; side.position.set(-16, 4.5, 6); g.add(side);
+    wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(6, 2);
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.94 });
+    // Замкнутая уютная комната (задняя, левая, правая стены, потолок и плинтус — без «пустоты» при вращении!)
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(56, 20), wallMat);
+    wall.position.set(0, 6.2, -5.2); wall.receiveShadow = true; g.add(wall);
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), wallMat);
+    leftWall.rotation.y = Math.PI / 2; leftWall.position.set(-16, 6.2, 8); g.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), wallMat);
+    rightWall.rotation.y = -Math.PI / 2; rightWall.position.set(16, 6.2, 8); g.add(rightWall);
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(56, 40), new THREE.MeshStandardMaterial({ color: 0xebe4d8, roughness: 0.96 }));
+    ceiling.rotation.x = Math.PI / 2; ceiling.position.set(0, 14.5, 8); g.add(ceiling);
+    // Тёплый деревянный плинтус вдоль стен
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x5c3e28, roughness: 0.65 });
+    const trimBack = new THREE.Mesh(new THREE.BoxGeometry(56, 0.34, 0.14), trimMat);
+    trimBack.position.set(0, -3.43, -5.14); g.add(trimBack);
+    // Уютная картина в рамке на задней стене справа
+    const picTex = canvasTex(256, 192, (c, w, h) => {
+      const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#8cc8dc'); gr.addColorStop(0.55, '#d6e6c8'); gr.addColorStop(1, '#58825a');
+      c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#3c6848'; c.beginPath(); c.moveTo(0, h); c.lineTo(70, 92); c.lineTo(155, 130); c.lineTo(220, 82); c.lineTo(w, 120); c.lineTo(w, h); c.fill();
+      c.fillStyle = '#fff3c4'; c.beginPath(); c.arc(195, 48, 18, 0, 7); c.fill();
+    });
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.0, 0.12), trimMat); frame.position.set(8.8, 5.2, -5.12); g.add(frame);
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.7), new THREE.MeshStandardMaterial({ map: picTex, roughness: 0.85 })); art.position.set(8.8, 5.2, -5.05); g.add(art);
 
     // Окно
     this.windowMat = new THREE.MeshBasicMaterial({ color: 0xcfe8ff });
@@ -247,39 +265,41 @@ export class Tank {
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
       const a = j * (nx + 1) + i, b = a + nx + 1; idx.push(a, b, a + 1, b, b + 1, a + 1);
     }
-    // Срезы грунта у переднего и боковых стёкол
+    // Срезы грунта по ВСЕМ 4 сторонам стекла (перед, зад, левый, правый) — никаких дырок под песком сбоку!
     const addSkirt = (pts) => {
       const base = pos.length / 3;
       for (let i = 0; i < pts.length; i++) {
         const [x, top, z, u] = pts[i];
-        pos.push(x, top, z, x, -0.04, z);
-        uv.push(u, 1, u, 0.9);
-        col.push(0.78, 0.75, 0.72, 0.65, 0.62, 0.6);
+        pos.push(x, top, z, x, -0.11, z);
+        uv.push(u, 1, u, 0.85);
+        col.push(0.82, 0.79, 0.75, 0.68, 0.65, 0.62);
       }
       for (let i = 0; i < pts.length - 1; i++) { const a = base + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     };
-    const frontPts = [];
+    const frontPts = [], backPts = [], leftPts = [], rightPts = [];
     for (let i = 0; i <= nx; i++) {
-      const k = (nz * (nx + 1) + i) * 3;
-      frontPts.push([pos[k], pos[k + 1], D / 2, i / nx]);
+      const kf = (nz * (nx + 1) + i) * 3;
+      frontPts.push([pos[kf], pos[kf + 1], D / 2, i / nx]);
+      const kb = (nx - i) * 3;
+      backPts.push([pos[kb], pos[kb + 1], -D / 2, i / nx]);
+    }
+    for (let j = 0; j <= nz; j++) {
+      const kl = (j * (nx + 1)) * 3;
+      leftPts.push([-W / 2, pos[kl + 1], pos[kl + 2], j / nz]);
+      const kr = ((nz - j) * (nx + 1) + nx) * 3;
+      rightPts.push([W / 2, pos[kr + 1], pos[kr + 2], j / nz]);
     }
     addSkirt(frontPts);
-    if (TANK.isPaludarium) {
-      // Правый срез берега, чтобы суша выглядела монолитной через правое стекло
-      const rightPts = [];
-      for (let j = nz; j >= 0; j--) {
-        const k = (j * (nx + 1) + nx) * 3;
-        rightPts.push([W / 2, pos[k + 1], pos[k + 2], j / nz]);
-      }
-      addSkirt(rightPts);
-    }
+    addSkirt(backPts);
+    addSkirt(leftPts);
+    addSkirt(rightPts);
 
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setIndex(idx); g.computeVertexNormals();
-    const mat = addCaustics(new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.94 }), 0.42);
+    const mat = addCaustics(new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.94, side: THREE.DoubleSide }), 0.42);
     this.substrate = new THREE.Mesh(g, mat);
     this.substrate.receiveShadow = true;
     this.tankGroup.add(this.substrate);
@@ -355,24 +375,47 @@ export class Tank {
     const thr = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.4, 0.025), new THREE.MeshBasicMaterial({ color: 0xe03030 }));
     thr.position.set(tx, ty - 0.08, TANK.glassFront - 0.015); g.add(thr);
 
-    // Распылитель и компрессор
+    // Распылитель и компрессор (компрессор стоит ровно НА крышке тумбы сзади справа, шланг аккуратно идёт за стекло!)
     const [ax, az] = TANK.airPos || [2.35, -1.0];
     const ay = groundY(ax, az) + 0.05;
     const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.12, 16), new THREE.MeshStandardMaterial({ color: 0x5f7a86, roughness: 0.95 }));
     stone.position.set(ax, ay, az); g.add(stone);
+    const compX = TANK.glassSide + 0.28, compZ = -TANK.glassFront + 0.35;
     const hose = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
       new THREE.Vector3(ax, ay + 0.05, az),
-      new THREE.Vector3(ax + 0.2, ay + 0.5, -TANK.glassFront + 0.08),
-      new THREE.Vector3(ax + 0.25, Hh - 0.1, -TANK.glassFront + 0.08),
-      new THREE.Vector3(ax + 0.35, Hh + 0.2, -TANK.glassFront - 0.25),
-      new THREE.Vector3(TANK.glassSide + 0.75, 0.2, -TANK.glassFront - 0.2),
-    ]), 36, 0.024, 6), new THREE.MeshStandardMaterial({ color: 0xbfe8e0, transparent: true, opacity: 0.7, roughness: 0.2 }));
+      new THREE.Vector3(ax + 0.12, ay + 0.5, -TANK.glassFront + 0.08),
+      new THREE.Vector3(ax + 0.18, Hh - 0.12, -TANK.glassFront + 0.08),
+      new THREE.Vector3(TANK.glassSide + 0.1, Hh - 0.05, -TANK.glassFront + 0.05),
+      new THREE.Vector3(compX, 1.4, -TANK.glassFront + 0.12),
+      new THREE.Vector3(compX, 0.18, compZ),
+    ]), 36, 0.022, 6), new THREE.MeshStandardMaterial({ color: 0xbfe8e0, transparent: true, opacity: 0.62, roughness: 0.2 }));
     g.add(hose);
 
-    this.compressorBody = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.42, 0.56), new THREE.MeshStandardMaterial({ color: 0x2a5d8c, roughness: 0.5 }));
-    this.compressorBody.position.set(TANK.glassSide + 0.9, -0.0, -TANK.glassFront);
+    // Компрессор на резиновой подставке ровно на поверхности тумбы (y = -0.12 — верх столешницы)
+    this.compressorBody = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.3, 0.62), new THREE.MeshStandardMaterial({ color: 0x264b6e, roughness: 0.45, metalness: 0.2 }));
+    this.compressorBody.position.set(compX, 0.03, compZ);
     this.compressorBody.castShadow = true; g.add(this.compressorBody);
     this.airStone = new THREE.Vector3(ax, ay + 0.08, az);
+
+    // Мягкие подводные лучи света от светильника (добавляют глубину и реализм)
+    const rayTex = canvasTex(64, 256, (c, w, h) => {
+      const gr = c.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, 'rgba(220,248,255,0.22)');
+      gr.addColorStop(0.55, 'rgba(180,238,255,0.08)');
+      gr.addColorStop(1, 'rgba(160,230,255,0)');
+      c.fillStyle = gr; c.fillRect(0, 0, w, h);
+    });
+    this.rayMat = new THREE.MeshBasicMaterial({ map: rayTex, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    this.lightRays = new THREE.Group();
+    const rayH = Math.max(1.0, TANK.waterTop - 0.35);
+    for (const rx of [-W * 0.24, 0.15, W * 0.25]) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.22, rayH), this.rayMat);
+      m.position.set(rx, TANK.waterTop - rayH / 2, -0.15);
+      m.rotation.z = -0.14;
+      m.renderOrder = 2;
+      this.lightRays.add(m);
+    }
+    g.add(this.lightRays);
   }
 
   // ---------- Осадок (детрит) на грунте для мини-игры Сифон ----------
@@ -566,6 +609,11 @@ export class Tank {
     this.ledMat.color.copy(this.lamp.color).multiplyScalar(0.12 + L * 1.2);
     G.uLampColor.value.copy(this.lamp.color);
     G.uLampPower.value = L;
+    if (this.rayMat) {
+      this.rayMat.color.copy(this.lamp.color);
+      this.rayMat.opacity = L * (this.quality === 'low' ? 0 : 0.38);
+      if (this.lightRays) this.lightRays.visible = L > 0.04 && this.quality !== 'low';
+    }
 
     this.hemi.intensity = damp(this.hemi.intensity, p.hemi, k, dt);
     this.hemi.color.lerp(_c2.setHex(p.hemiSky), alphaK);
